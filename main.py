@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from flask import Flask, request, render_template_string
+from flask import Flask, request, render_template_string, send_file
 from pyngrok import ngrok
 
 # .envファイルから環境変数を読み込む
@@ -32,6 +32,8 @@ def index():
                 uploaded_image_filename = filename
 
     # HTMLテンプレート（画像があれば表示してクリック取得）
+    # 画像表示部分で直接 "layout.png" にアクセスするのではなく、
+    # "/uploaded_image" ルートを叩くようにする。
     html_template = '''
 <html>
 <head>
@@ -49,7 +51,7 @@ def index():
 {% if uploaded_image %}
   <h3>アップロードされた画像:</h3>
   <img id="floor_image"
-       src="{{ uploaded_image }}"
+       src="/uploaded_image"
        style="max-width:600px; cursor: crosshair;"
        onclick="getClickPosition(event)">
 
@@ -102,6 +104,17 @@ def index():
 
     return render_template_string(html_template, uploaded_image=uploaded_image_filename)
 
+@app.route('/uploaded_image')
+def uploaded_image():
+    """
+    アップロードした画像を返すルート。
+    ここから send_file で layout.png を返すことで、リンク切れしなくなる。
+    """
+    global uploaded_image_filename
+    if not uploaded_image_filename:
+        return "No image uploaded."
+    return send_file(uploaded_image_filename, mimetype='image/png')
+
 @app.route('/save_coordinate', methods=['POST'])
 def save_coordinate():
     global table_data
@@ -127,7 +140,6 @@ def view_tables():
     return html
 
 # ---- Flaskサーバー起動 (port=5000) ----
-# ngrokトンネルを開く
 public_url = ngrok.connect(5000)
 print(" * ngrok tunnel URL:", public_url.public_url)
 
