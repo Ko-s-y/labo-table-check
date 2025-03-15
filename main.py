@@ -133,4 +133,3 @@ print(" * ngrok tunnel URL:", public_url.public_url)
 
 # Flaskアプリを起動
 app.run(port=5000)
-s
