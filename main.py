@@ -127,7 +127,7 @@ def view_tables():
     return html
 
 # ---- Flaskサーバー起動 (port=5000) ----
-# Colab上でngrokトンネルを開く
+# ngrokトンネルを開く
 public_url = ngrok.connect(5000)
 print(" * ngrok tunnel URL:", public_url.public_url)
 
