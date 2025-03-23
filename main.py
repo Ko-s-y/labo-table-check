@@ -12,29 +12,36 @@ auth_token = os.environ.get("NGROK_AUTH_TOKEN")
 if not auth_token:
     raise ValueError("環境変数 NGROK_AUTH_TOKEN が設定されていません。")
 
+# ngrokの認証トークンを設定
 ngrok.set_auth_token(auth_token)
 
 # Flaskアプリを定義
 app = Flask(__name__)
 
+# アップロードされた画像ファイル名を保持する変数
 uploaded_image_filename = None
-table_data = []  # (x座標, y座標, テーブル番号) のリスト
+
+# タッチされた座標とテーブル番号を保存するリスト (x座標, y座標, テーブル番号)
+table_data = []
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
+    """
+    画像アップロード画面(トップページ)
+    """
     global uploaded_image_filename
 
     if request.method == 'POST':
         if 'image_file' in request.files:
             image = request.files['image_file']
             if image:
-                # layout.png として保存 (セッション切れでファイル消える点に注意)
+                # layout.png という名前で保存 (セッション切れでファイル消えることに注意)
                 filename = "layout.png"
                 image.save(filename)
                 uploaded_image_filename = filename
 
-    # HTMLテンプレート（画像があれば表示してクリック取得）
-    # 画像表示は "/uploaded_image" (下記ルート) を経由して返す
+    # HTMLテンプレート（画像があれば表示し、クリック取得）
+    # 画像表示は "/uploaded_image" というエンドポイントから取得
     html_template = '''
 <html>
 <head>
@@ -60,13 +67,15 @@ def index():
     function getClickPosition(event){
       const img = document.getElementById("floor_image");
       const rect = img.getBoundingClientRect();
-      // 画像の左上を(0,0)としたときのクリック相対座標
+      // 画像の左上を(0,0)としたときのクリック相対座標を計算
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
+      // テーブル番号を入力してもらう
       const tableNum = prompt("テーブル番号を入力してください（例: 1, 2, 3 ...）");
-      if (!tableNum) return;
+      if (!tableNum) return;  // キャンセル等で未入力の場合は何もしない
 
+      // 座標とテーブル番号をサーバーへPOSTするフォームを動的に作成して送信
       const form = document.createElement("form");
       form.method = "POST";
       form.action = "/save_coordinate";
@@ -113,15 +122,15 @@ def uploaded_image():
     global uploaded_image_filename, table_data
 
     if not uploaded_image_filename:
-        return "No image uploaded."
+        return "まだ画像がアップロードされていません。"
 
     # 1) 画像ファイルをPILで開く
-    img = Image.open(uploaded_image_filename)
+    img = Image.open(uploaded_image_filename).convert("RGBA")
     draw = ImageDraw.Draw(img)
 
     # 2) table_data の各テーブル(x, y)に赤枠を描画
-    #    ここでは中心(x, y)を囲む 20x20px の四角を例にしています
-    #    (x-10, y-10) ～ (x+10, y+10) を囲む
+    #    ここでは中心(x, y)を囲む 20x20px の四角を例にしており、
+    #    (x-10, y-10) ～ (x+10, y+10) の範囲を囲みます
     box_size = 10
     for x_str, y_str, table_num in table_data:
         x = float(x_str)
@@ -131,7 +140,7 @@ def uploaded_image():
         right = x + box_size
         bottom = y + box_size
 
-        # outline='red' -> 赤枠, width=3 -> 枠線太さ3px
+        # outline='red' -> 赤枠, width=3 -> 枠線の太さ3px
         draw.rectangle([left, top, right, bottom], outline='red', width=3)
 
     # 3) 書き込んだイメージをバイナリとして返す
@@ -153,7 +162,7 @@ def save_coordinate():
     table_data.append((x, y, table_num))
 
     return f"""
-    <p>登録しました: テーブル番号 <b>{table_num}</b> (x={x}, y={y})</p>
+    <p>テーブル番号 <b>{table_num}</b> を登録しました。 (x={x}, y={y})</p>
     <p><a href='/view_tables'>登録情報を見る</a></p>
     <p><a href='/'>トップへ戻る</a></p>
     """
@@ -164,7 +173,7 @@ def view_tables():
     登録されているテーブル情報一覧を表示
     """
     global table_data
-    html = "<h2>登録されたテーブル情報</h2>"
+    html = "<h2>登録されたテーブル情報一覧</h2>"
     for idx, (x, y, tnum) in enumerate(table_data):
         html += f"<p>{idx+1}：テーブル番号 <b>{tnum}</b> → (x={x}, y={y})</p>"
     html += "<br><a href='/'>トップへ戻る</a>"
